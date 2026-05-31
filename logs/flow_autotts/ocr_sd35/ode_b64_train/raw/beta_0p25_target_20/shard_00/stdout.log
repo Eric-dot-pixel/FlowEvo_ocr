@@ -1,0 +1,9 @@
+[2026/05/30 04:30:11] ppocr WARNING: The first GPU is used for inference by default, GPU ID: 0
+[2026/05/30 04:30:13] ppocr WARNING: The first GPU is used for inference by default, GPU ID: 0
+{
+  "beta": 0.25,
+  "history_path": "/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/ode_b64_train/raw/beta_0p25_target_20/shard_00/history.json",
+  "num_samples": 125,
+  "summary_path": "/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/ode_b64_train/raw/beta_0p25_target_20/shard_00/summary.json",
+  "total_nfe": 20
+}

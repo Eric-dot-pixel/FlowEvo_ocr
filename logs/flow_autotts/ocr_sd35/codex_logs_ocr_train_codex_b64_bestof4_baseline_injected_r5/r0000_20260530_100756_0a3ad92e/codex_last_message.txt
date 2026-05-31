@@ -1,0 +1,41 @@
+Implemented a new preview-driven controller in [flow_autotts/controllers/optimal.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/optimal.py). The idea is staged scout previews, then score-gap/uncertainty-based allocation: cheap mid-time probes rank roots early, weak roots are pruned, survivors get completion/confirmation, and only strong anchors receive backward children. Extra beta is spent monotonically through more roots, more confirmations, more refinement children, and more late tail-budget confirmation.
+
+I inspected the required files and only targeted reads: `flow_tts_controller_implementation_spec.md`, the round-0 context pack, [flow_autotts/controllers/optimal.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/optimal.py), [flow_autotts/controllers/baselines.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/baselines.py), plus public API details in [flow_autotts/core/state.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/core/state.py), [flow_autotts/core/errors.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/core/errors.py), and [flow_autotts/experiments/ocr_sd35/env.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/experiments/ocr_sd35/env.py). The context pack says this is round 0, so there were no prior proposal snapshots, no compact prior summaries, and no history/frontier rows beyond the injected best-of-4 ODE baseline. Latest known baseline rows from the pack are:
+- `beta=0.00`: target NFE `10`, baseline reward `0.000222`, ODE row NFE `8`
+- `beta=0.25`: target NFE `20`, baseline reward `0.356821`
+- `beta=0.50`: target NFE `36`, baseline reward `0.706879`
+- `beta=0.75`: target NFE `48`, baseline reward `0.760979`
+- `beta=1.00`: target NFE `64`, baseline reward `0.818322`
+
+Because there was no prior controller history, the required “latest reward and mean NFE” / “which betas beat baseline” / “last two snapshots” questions reduce to: there is no prior AutoTTS controller data yet, so the main weakness to target is the seed controller design itself. The old `optimal.py` was behaviorally narrow: it fully completed roots before gathering evidence, then added blind late backward children. The new mechanism is behaviorally non-trivial relative to that and the baselines: it adds early scout previews before commitment, adaptive pruning from score gaps, uncertainty-triggered confirmation, and anchor-selective backward refinement with tie-sensitive child allocation. That is the novelty for this round.
+
+Exact beta schedule:
+- `target_nfe = round(10 + 54 * beta^1.1)`, clamped to budget, with `beta=0` forced to `10`
+- `root_count = 2 + floor(3*beta)`
+- `scout_time = 0.4 + 0.2*beta`
+- `survivor_count = 1 + floor(2*beta)`
+- `confirm_count = 1 + floor(2*beta)`
+- `confirm_steps = floor(1 + 2*beta)`
+- `backward_children = floor(1 + 3*beta)` for `beta>0`, `0` at `beta=0`
+- `backward_time = 0.86 - 0.18*beta`
+- `noise_policy = mixed_noise` for `beta>=0.65`, else `fresh_noise`
+- `noise_strength = 0.45` for mixed noise, else `1.0`
+- `prune_margin = 0.18 - 0.08*beta`
+- `uncertainty_gate = 0.52 - 0.18*beta`
+- `late_preview_rounds = 1 + floor(3*beta)` for `beta>0`, `0` at `beta=0`
+- `use_sde_scout = True` only for `beta>=0.75`
+
+Budget monotonicity comes from every spend-relevant term increasing or staying flat with beta: more roots, at least as many survivors, at least as many confirmation steps, more backward children, more late spend rounds, later and less aggressive pruning, and optional SDE scouts only at higher beta. `beta=1` avoids exceeding 64 because every spend path uses `_can_afford(...)` against `target_nfe`, and `target_nfe` is clamped to `env.budget`; the controller never calls `latest_active` except fallback, so it avoids hidden final-forward overshoot.
+
+Per-beta target-NFE reflection:
+- `beta=0.00`, target `10`: intentionally under target a little if scout evidence is already enough. I kept this conservative on purpose; this is justified rather than accidental underuse because low-beta should not waste compute. It uses 2 roots, mid scout, prune to 1, then one finish/preview path.
+- `beta=0.25`, target `20`: adjusted to improve utilization via 2 roots, scout previews, one survivor finish, one confirmation/refinement slot. Expected to stay close because the target aligns with one small breadth phase plus one completion.
+- `beta=0.50`, target `36`: adjusted upward with 3 roots, 2 survivors, more confirmation, and at least 2 refinement children. This is meant to avoid the obvious underuse risk that a pure finish-best-root policy would have at mid budget.
+- `beta=0.75`, target `48`: explicitly repaired for underuse by enabling SDE scouts, 4 roots, 2 survivors, 3 refinement children, and 3 late tail-budget rounds. This is one of the main intended improvement bands.
+- `beta=1.00`, target `64`: also adjusted to improve utilization with the widest root set, most confirmations, 4 refinement children, and extra late rounds, but still bounded by explicit affordability checks so it cannot exceed 64. This should stay reasonably close while preserving accuracy-first behavior.
+
+Checks run:
+- `python -m py_compile flow_autotts/controllers/optimal.py`
+- a tiny fake-env dry run over `beta in {0.0, 0.25, 0.5, 0.75, 1.0}` using only the public API shape
+
+Expected risks: early preview scores may still be noisy on OCR, so scout pruning could occasionally drop a slow-start branch; high-beta SDE scouts may add variance without enough gain; `beta=0` may remain slightly under target by design. The proposal is mainly meant to improve the weak-to-mid and high-budget regimes by reallocating compute away from blind full completions and toward evidence-gathering plus selective local refinement.

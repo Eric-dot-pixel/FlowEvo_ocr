@@ -1,0 +1,37 @@
+Implemented a new controller in [optimal.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/optimal.py). The idea is a beta-conditioned, preview-first controller that spends compute in three stages: bounded scout width, staged contender advancement, and probe-before-commit backward refinement. The new mechanism is that backward children are no longer blindly finished to `t=1`; they are first advanced only to a late preview, then only the strongest active branch is promoted to full completion. The tail budget also reacts to score gaps: if the top two previews are close, it spends on the runner-up or a local rebranch instead of tunneling on the current leader.
+
+I inspected the compact baseline/target rows from the context pack, the latest frontier in `r0003`, the incumbent `r0000`, the rejected `r0001`/`r0002` lessons, and the controller snapshots for `r0000` and `r0003`. Latest `r0003` frontier was:
+- `beta=0.0`: reward `0.480700`, mean NFE `10.0`
+- `beta=0.25`: reward `0.552740`, mean NFE `19.0`
+- `beta=0.5`: reward `0.702412`, mean NFE `35.546`
+- `beta=0.75`: reward `0.768340`, mean NFE `48.0`
+- `beta=1.0`: reward `0.808591`, mean NFE `63.398`
+
+Relative to the beta-matched ODE baseline, `r0003` already beat baseline at `beta=0, 0.25, 0.75`, and still trailed slightly at `beta=0.5` and `beta=1.0`. The last two accepted snapshots were not cosmetic: `r0003` already changed behavior versus `r0000` by using target-NFE discipline, more preview, and gentler pruning. My change is another structural step, because it changes where refinement budget goes: late probes first, full finishes later.
+
+The exact beta schedule is piecewise and monotone:
+- Target NFE is piecewise-linear through `(0.0,10)`, `(0.25,20)`, `(0.5,36)`, `(0.75,48)`, `(1.0,64)`, capped by `env.budget`.
+- `root_count = 1 + I[beta>=0.5] + I[beta>=0.75] + I[beta>=0.95]`
+- `scout_step = min(S-2, 3 + I[beta>=0.5])`
+- `mid_step = scout_step + 3`, `late_step = mid_step + 2`, both capped by the grid
+- `survivor_count = 1 + I[beta>=0.75]`
+- `max_child_probes = 1 + I[beta>=0.25] + I[beta>=0.5] + I[beta>=0.75] + I[beta>=0.95]`
+- `finish_budget = 1 + I[beta>=0.75]`
+- `tail_rounds = 1 + I[beta>=0.5] + I[beta>=0.75] + I[beta>=0.95]`
+- `mixed_noise` is used only for `beta>=0.75`
+- a single SDE scout is used only at `beta>=0.95`, and only on the last root
+
+Budget use is monotone because higher beta never lowers the target NFE, root count, child-probe budget, finish budget, or tail rounds. `beta=1.0` cannot exceed `64` because `target_nfe` is capped at `64`, every action is guarded by `_can_afford(...)`, and termination uses `answer(rule="best_preview_score")` rather than `latest_active`, so there is no implicit final rollout overshoot.
+
+Per beta, the target-NFE reflection is:
+- `beta=0.0`, target `10`: prior underuse was already repaired in `r0003`; I kept a locked single-root, two-preview ladder designed to land exactly at `10`. Underuse is not justified here and was not left unresolved.
+- `beta=0.25`, target `20`: `r0003` was at `19`, which looked mildly conservative after the stronger `r0000` result at similar cost. I adjusted this regime to allow one finish plus up to two child probes and one tail action, so it should stay near `20` without wasting budget on broad width.
+- `beta=0.5`, target `36`: this was one of the main weak spots and the `35.546` underuse looked unjustified. I increased willingness to spend with `2` roots, `3` child probes, one finish promotion, and one tail action, specifically to repair allocation near this budget.
+- `beta=0.75`, target `48`: this regime was already above baseline at exactly target NFE, so I mostly protected it. It gets more diversity than low beta, but pruning remains conservative enough to avoid collapsing too early.
+- `beta=1.0`, target `64`: this was the primary weakness and the `63.398` underuse looked unjustified. I increased width to `4` roots, allow `5` child probes, `2` finish promotions, and `4` tail rounds, with one bounded SDE scout to add diversity without letting stochasticity dominate.
+
+Checks run:
+- `python -m py_compile flow_autotts/controllers/optimal.py`
+- a tiny fake-env dry run for `beta in {0.0, 0.25, 0.5, 0.75, 1.0}`; it produced NFE usage `10, 19, 36, 48, 64`, which is the intended schedule shape and verified the contract paths
+
+Expected risks are that extra width at `beta=0.5` and `beta=1.0` could be hurt by noisy early previews, and that late probe-first refinement may trade a little peak reward at `beta=0.75` if the old immediate-finish path was already ideal there. The proposal is mainly meant to improve `beta=0.5` and `beta=1.0`, while keeping `beta=0.0` and `beta=0.75` stable and keeping `beta=0.25` close to its strong prior tradeoff.

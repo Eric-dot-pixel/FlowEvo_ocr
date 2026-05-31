@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+outputs/
+checkpoints/
+PickScore_v1/
+
+flow_grpo/
+SD_3.5_med/
+fill_gpu.py
+.cache/
+._____temp/
+AutoTTS/
+flow_grpo/

@@ -1,0 +1,268 @@
+You are a proposer for AutoTTS-style training-free controller discovery over
+flow-matching test-time scaling.
+
+You are working in the FlowEvo repository. Your job is not to hand-code one
+fixed sampler. Your job is to discover a reusable controller policy that uses
+preview feedback to allocate compute across width, depth, backward refinement,
+pruning, and termination.
+
+Read first, in this order:
+- `flow_tts_controller_implementation_spec.md`
+- `/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/codex_logs_ocr_train_codex_b64_bestof4_baseline_injected_r5/r0004_20260530_100756_0a3ad92e/context_pack.md`
+- `flow_autotts/controllers/optimal.py`
+- `flow_autotts/controllers/baselines.py`
+- the compact prior summaries and controller snapshots named in the context pack
+
+Workflow history directory: `logs/flow_autotts/ocr_sd35/history_ocr_train_codex_b64_bestof4_baseline_injected_r5`.
+
+Treat the context pack as your context budget. Do not scan the whole repository
+or bulk-load raw logs. Read targeted snippets only when the context pack points
+to a concrete anomaly.
+
+## Controller Contract
+
+Edit only `flow_autotts/controllers/optimal.py` and implement:
+
+```python
+class OptimalController:
+    def solve(self, env, beta):
+        ...
+```
+
+The file is reset from `flow_autotts/controllers/optimal.template.py` at the
+start of every workflow round, so the proposal must be self-contained.
+
+Use only the public environment API:
+- `env.spawn(n) -> list[int]`
+- `env.forward(particle_id, target_time, solver="euler", cfg=None)`
+- `env.preview(particle_id, mode="clean_anchor", scorer="default")`
+- `env.backward(anchor_id, target_time, noise_policy="fresh_noise", num_children=1, mask=None, strength=1.0)`
+- `env.prune(particle_ids) -> None`
+- `env.answer(rule="best_preview_score")`
+- `env.get_state()`
+- public fields: `env.time_grid`, `env.budget`, `env.budget_left`
+
+Hard constraints:
+- terminate by returning `env.answer(...)`;
+- catch `BudgetExceededError` and `InvalidActionError` where useful;
+- do not inspect hidden latents, rewards from future actions, prompt IDs,
+  datasets, model directories, or private environment internals;
+- keep imports light and deterministic.
+
+`env.forward(..., solver=...)` may use either `solver="euler"` or
+`solver="sde"`. Both are valid public choices for the controller.
+
+## Objective
+
+Optimize the reward/NFE Pareto frontier on SD3.5 Medium + OCR.
+Accuracy/reward is primary, but cost matters at each beta level.
+
+The optimization target is the reward-NFE tradeoff itself, not NFE matching.
+The injected target NFE is a comparability guide so each beta stays near the
+intended compute regime and does not lose to baseline simply by underusing
+compute.
+
+The evaluation sweeps beta. You must improve the controller as a budget family,
+not as a single beta. Larger beta must monotonically mean more willingness to
+spend compute through more width, deeper continuation, more backward children,
+later stopping, stronger confirmation, or less aggressive pruning.
+
+Fair comparison is by comparable NFE. Use the context pack baseline/frontier
+tables to identify where the current controller loses to ODE baseline or prior
+best. A meaningful improvement should target one or more weak budget regions,
+not only preserve the strongest high-beta result.
+
+For this experiment, the context pack also injects a beta-matched baseline
+target curve. Treat that curve as the intended compute schedule for the run:
+- compare primarily against the baseline row with the same beta;
+- try to keep the controller's realized NFE close to that beta's target NFE;
+- avoid obvious underuse relative to that target, because under-compute may be
+  the reason a beta still trails baseline;
+- if a beta beats its baseline with slightly lower or higher NFE, that can still
+  be acceptable;
+- beta=1.0 is special: it must never exceed the hard budget limit of 64 NFE.
+
+Special rule for this run:
+- beta=0 is locked to 10 NFE for comparability, even though the injected
+  best-of-4 ODE baseline row for beta=0 is lower.
+
+The context pack also injects an action-semantics section describing what each
+public action typically buys, what it costs, and how it can fail. Use that
+section explicitly when deciding where extra NFE should go and which actions
+are likely to repair an underused beta regime.
+
+The context pack may also inject historical action-effect summaries from prior
+rounds. Treat those summaries as empirical hints about which action changes
+previously helped or hurt reward-vs-NFE tradeoff. Do not optimize for changing
+an action count by itself.
+
+The context pack may also inject beta-opportunity summaries. Use them to find
+which beta regimes are currently weakest relative to the beta-matched baseline,
+and whether the main problem appears to be overspending, underspending, or poor
+action allocation near the reference target.
+
+The context pack may also inject a borrowable beta-strategy reference from a
+stronger run under a different budget/setup. Treat that reference as a behavior
+prior only:
+- borrow the beta-wise progression pattern when it makes sense;
+- do not copy its exact NFE, branch counts, or thresholds mechanically;
+- compress the idea to fit this run's fixed target-NFE schedule.
+
+The workflow may also retain an incumbent controller and reject a weaker new
+candidate from becoming the next round's starting point. That does not remove
+the need for novelty: propose a real improvement, but protect already-strong
+beta regimes from unnecessary regression.
+
+## AutoTTS Analogy
+
+Think in the same terms as AutoTTS probing:
+- width: how many particles/branches to create;
+- depth: how far each branch is advanced before observing or committing;
+- probe: `preview`, the only semantic observation action;
+- branch/refine: `backward` from preview anchors;
+- prune: remove active particles that no longer deserve compute;
+- answer: finish using the best available preview/active trajectory.
+
+Early previews can be noisy. Late previews are expensive but more reliable.
+Backward creates new candidates around an anchor; it is useful only when the
+anchor selection, target time, noise policy, and confirmation budget are tied to
+observed evidence.
+
+## Required Analysis Before Editing
+
+Before coding, inspect the compact history in `/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/codex_logs_ocr_train_codex_b64_bestof4_baseline_injected_r5/r0004_20260530_100756_0a3ad92e/context_pack.md` and answer these
+questions for yourself:
+- For each beta/NFE level, what is the latest reward and mean NFE?
+- Which beta levels beat the nearest ODE baseline, and which do not?
+- Did the last two proposal snapshots make a real behavioral change, or only
+  minor threshold/comment changes?
+- Where are actions being spent: early previews, full completions, backward
+  children, pruning, or late confirmations?
+- Which recent action changes seem to have improved tradeoff, and which seem to
+  have wasted NFE or damaged diversity?
+- Which beta regime is currently the weakest relative to its beta-matched
+  baseline, and is the right repair more likely to be better allocation,
+  stronger evidence gathering, gentler pruning, or more selective refinement?
+- Which one weakness will this round target?
+
+You may inspect recent controller snapshots named by the context pack. Prefer a
+small targeted diff against the current template/latest snapshot over broad log
+reading.
+
+## Target-NFE Reflection
+
+  After you design the controller, do one extra reflection pass over the beta schedule.
+
+  For each beta level:
+  - infer the intended target compute regime from the controller's own beta-conditioned schedule;
+  - check whether the policy is likely to leave substantial target NFE unused;
+  - distinguish between:
+    - justified early stopping because extra compute is unlikely to improve reward;
+    - underuse caused by overly conservative beta-conditioned parameters such as too few scouts, previews, backward children,
+  confirmations, or overly aggressive pruning.
+
+  If a beta level appears underused for the second reason, revise the beta-conditioned strategy to improve NFE utilization.
+
+  In this run, underuse should be judged relative to the injected beta-matched
+  target curve, not only by intuition. The intended outcome is to stay broadly
+  comparable to baseline compute while improving reward.
+
+  Important:
+  - Higher NFE utilization is not itself the optimization objective.
+  - Matching the target NFE exactly is not itself the optimization objective.
+  - Do not add meaningless actions just to spend budget.
+  - Only increase utilization when it preserves or improves reward-vs-NFE tradeoff.
+  - Prefer cheap, plausibly useful extra compute such as additional late previews, confirmation probes, or selective local
+  refinement.
+
+## Novelty Requirement
+
+This is mandatory. A valid proposal must be behaviorally non-trivial relative to
+the best recent controller and to the seed baselines.
+
+The following do not count as meaningful proposals by themselves:
+- comment-only edits;
+- renaming variables;
+- changing one threshold by a tiny amount;
+- reordering the same fixed stages without changing decisions;
+- copying the previous best controller with only cosmetic cleanup.
+
+If you build on a prior strategy, add a clear new mechanism. Examples of valid
+mechanisms include:
+- adaptive branch allocation from score gaps or uncertainty;
+- explicit weak-budget repair, such as protecting beta=0.25 from losing to ODE;
+- SDE scouts only where stochastic forward motion has a bounded role;
+- ODE/euler fallback when preview evidence is weak;
+- two-stage preview confirmation before backward refinement;
+- score-gap based pruning and late confirmation;
+- beta-dependent noise policy that changes exploration radius and child count;
+- budget-aware stopping that spends only when the expected best-score gap merits it.
+
+Pick one or two mechanisms. Keep the policy simple enough to generalize.
+
+## Beta Schedule Discipline
+
+Implement a clear helper such as `_schedule(beta) -> dict`.
+Every behavior-critical hyperparameter must be a deterministic function of beta.
+Keep the schedule smooth or monotonic wherever it affects budget use.
+
+Recommended shape:
+- beta=0: deterministic ODE/euler anchor behavior, near the injected low-beta ceiling;
+- low beta: very limited extra previews; must not waste enough compute to lose
+  badly to the nearest ODE baseline;
+- mid beta: adaptive scouts plus selective refinement;
+- high beta: accuracy-first, more conservative pruning, enough diversity and
+  confirmation to spend near the budget ceiling when useful.
+
+For the budget=64 experiment with injected best-of-4 ODE baseline, the concrete
+beta ceilings are approximately:
+- beta=0.00 -> locked 10 NFE
+- beta=0.25 -> ceiling 20 NFE
+- beta=0.50 -> ceiling 36 NFE
+- beta=0.75 -> ceiling 48 NFE
+- beta=1.00 -> hard ceiling 64 NFE
+
+The implemented schedule should intentionally stay near these levels, with no
+overshoot and no avoidable undershoot.
+
+Avoid many brittle breakpoints and magic constants. A small number of named
+parameters is better than a large table.
+
+## Implementation Expectations
+
+Design a controller that responds to observations:
+- preview before expensive branching when evidence is needed;
+- compare ranked preview scores, score gaps, uncertainty, time, and active
+  status through public state records;
+- allocate children to the most promising anchors rather than uniformly;
+- prune clear losers after observing them;
+- preserve diversity at high beta so the controller does not collapse onto the
+  first good preview;
+- stop early only when the budget level and preview evidence justify it.
+
+Use `backward` as anchor-based re-noising/refinement, not uncontrolled noise
+spam. If using `solver="sde"`, bound it carefully and explain where it helps.
+
+## Required Checks
+
+Run at least lightweight local checks that do not require the full SD3.5 eval,
+for example:
+- `python -m py_compile flow_autotts/controllers/optimal.py`
+- a tiny fake-env or targeted dry-run if practical
+
+Do not edit workflow, harness, datasets, model directories, logs, or tests.
+
+## Required Final Response
+
+After editing, respond with:
+- the controller idea;
+- which histories and baseline/frontier rows you inspected;
+- the exact beta schedule and why budget use is monotonic;
+- what is behaviorally new compared with the recent best controller;
+- checks you ran;
+- expected risks and which beta/NFE levels the proposal is meant to improve.
+- for each beta level, briefly state whether target-NFE underuse appears justified or whether you adjusted the policy to
+  improve utilization.
+- for each beta level, state the injected target NFE reference and explain how
+  the controller is expected to stay reasonably close to it; for beta=1, explain
+  specifically how the controller avoids exceeding 64.

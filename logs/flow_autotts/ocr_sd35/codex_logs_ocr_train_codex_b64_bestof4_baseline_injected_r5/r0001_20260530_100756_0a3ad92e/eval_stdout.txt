@@ -1,0 +1,190 @@
+{
+  "devices": [
+    "cuda:0",
+    "cuda:1",
+    "cuda:2",
+    "cuda:3"
+  ],
+  "output": "/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/ocr_train_codex_b64_bestof4_baseline_injected_r5/history.json",
+  "shard_root": "/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/ocr_train_codex_b64_bestof4_baseline_injected_r5/shards",
+  "summary": {
+    "betas": [
+      0.0,
+      0.25,
+      0.5,
+      0.75,
+      1.0
+    ],
+    "budget": 64,
+    "evaluated_sample_size": 500,
+    "experiment": "ocr_sd35",
+    "num_shards": 4,
+    "rounds": [
+      {
+        "beta_sweep": [
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "forward": 1.0,
+              "mean_nfe": 8.0,
+              "preview": 2.0,
+              "spawn": 1.0
+            },
+            "behavior_summary": "single-root preview (spawn=1.00, preview=2.00, nfe=8.00)",
+            "beta": 0.0,
+            "nfe": 8,
+            "reward": 0.35812286028519574,
+            "reward_per_nfe": 0.04476535753564947
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 0.612,
+              "forward": 3.614,
+              "mean_nfe": 19.614,
+              "preview": 4.388,
+              "prune": 0.366,
+              "spawn": 2.0
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=2.00, preview=4.39, backward=0.61, prune=0.37, nfe=19.61)",
+            "beta": 0.25,
+            "nfe": 19.614,
+            "reward": 0.5215492008378494,
+            "reward_per_nfe": 0.026370055264377093
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 1.2,
+              "forward": 5.212,
+              "mean_nfe": 34.222,
+              "preview": 6.458,
+              "prune": 0.458,
+              "spawn": 3.0
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=3.00, preview=6.46, backward=1.20, prune=0.46, nfe=34.22)",
+            "beta": 0.5,
+            "nfe": 34.222,
+            "reward": 0.670363291390437,
+            "reward_per_nfe": 0.01957197650891124
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 2.43,
+              "forward": 7.43,
+              "mean_nfe": 45.81,
+              "preview": 8.52,
+              "spawn": 3.0
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=3.00, preview=8.52, backward=2.43, nfe=45.81)",
+            "beta": 0.75,
+            "nfe": 45.81,
+            "reward": 0.7406298796407323,
+            "reward_per_nfe": 0.01620762267869584
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 2.594,
+              "forward": 8.63,
+              "mean_nfe": 60.268,
+              "preview": 9.532,
+              "spawn": 4.036
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=4.04, preview=9.53, backward=2.59, nfe=60.27)",
+            "beta": 1.0,
+            "nfe": 60.268,
+            "reward": 0.7928090415885247,
+            "reward_per_nfe": 0.013184003478703247
+          }
+        ],
+        "controller": "optimal",
+        "controller_name": "OptimalController",
+        "pareto_frontier": [
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "forward": 1.0,
+              "mean_nfe": 8.0,
+              "preview": 2.0,
+              "spawn": 1.0
+            },
+            "behavior_summary": "single-root preview (spawn=1.00, preview=2.00, nfe=8.00)",
+            "beta": 0.0,
+            "nfe": 8,
+            "reward": 0.35812286028519574,
+            "reward_per_nfe": 0.04476535753564947
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 0.612,
+              "forward": 3.614,
+              "mean_nfe": 19.614,
+              "preview": 4.388,
+              "prune": 0.366,
+              "spawn": 2.0
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=2.00, preview=4.39, backward=0.61, prune=0.37, nfe=19.61)",
+            "beta": 0.25,
+            "nfe": 19.614,
+            "reward": 0.5215492008378494,
+            "reward_per_nfe": 0.026370055264377093
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 1.2,
+              "forward": 5.212,
+              "mean_nfe": 34.222,
+              "preview": 6.458,
+              "prune": 0.458,
+              "spawn": 3.0
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=3.00, preview=6.46, backward=1.20, prune=0.46, nfe=34.22)",
+            "beta": 0.5,
+            "nfe": 34.222,
+            "reward": 0.670363291390437,
+            "reward_per_nfe": 0.01957197650891124
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 2.43,
+              "forward": 7.43,
+              "mean_nfe": 45.81,
+              "preview": 8.52,
+              "spawn": 3.0
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=3.00, preview=8.52, backward=2.43, nfe=45.81)",
+            "beta": 0.75,
+            "nfe": 45.81,
+            "reward": 0.7406298796407323,
+            "reward_per_nfe": 0.01620762267869584
+          },
+          {
+            "action_statistics": {
+              "answer": 1.0,
+              "backward": 2.594,
+              "forward": 8.63,
+              "mean_nfe": 60.268,
+              "preview": 9.532,
+              "spawn": 4.036
+            },
+            "behavior_summary": "preview-guided backward refinement (spawn=4.04, preview=9.53, backward=2.59, nfe=60.27)",
+            "beta": 1.0,
+            "nfe": 60.268,
+            "reward": 0.7928090415885247,
+            "reward_per_nfe": 0.013184003478703247
+          }
+        ],
+        "round_id": 0
+      }
+    ],
+    "sample_seed": 42,
+    "sample_size": 500,
+    "shard_index": null
+  },
+  "summary_output": "/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/logs/flow_autotts/ocr_sd35/ocr_train_codex_b64_bestof4_baseline_injected_r5/summary.json"
+}

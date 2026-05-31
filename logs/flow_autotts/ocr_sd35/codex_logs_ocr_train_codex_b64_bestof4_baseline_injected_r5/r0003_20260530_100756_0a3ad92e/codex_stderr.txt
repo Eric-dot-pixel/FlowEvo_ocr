@@ -1,0 +1,1 @@
+[codex_proposer] stderr merged into stdout.

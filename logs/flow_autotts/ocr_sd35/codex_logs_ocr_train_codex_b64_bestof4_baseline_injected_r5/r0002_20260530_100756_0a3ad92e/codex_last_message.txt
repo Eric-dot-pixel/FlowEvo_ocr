@@ -1,0 +1,74 @@
+Implemented a new `OptimalController.solve()` in [flow_autotts/controllers/optimal.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/optimal.py).
+
+**Controller Idea**
+The policy is a single-root, preview-first controller with a new probe-before-commit refinement loop. It builds a root preview ladder, then uses `backward` children as cheap local probes: each child gets an immediate preview at the backward target time, and only children that are competitive on score or reduce uncertainty/drift earn the expensive promotion to `t=0.9/1.0` plus a late confirmation preview. Tail budget is then spent on ambiguity-driven confirmation or one more local probe, rather than blindly finishing more branches.
+
+**What I inspected**
+I read:
+- `flow_tts_controller_implementation_spec.md`
+- the injected context pack at `.../r0002.../context_pack.md`
+- current [optimal.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/optimal.py) and [baselines.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/controllers/baselines.py)
+- [state.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/core/state.py), [errors.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/core/errors.py), [env.py](/inspire/hdd/global_user/gongjingjing-25039/sywang/jkcai/FlowEvo_ocr/flow_autotts/experiments/ocr_sd35/env.py)
+- snapshot controllers from `r0000` and rejected `r0001`, plus `r0001` summary
+
+From the compact history:
+- `beta=0.0`: latest `reward=0.358123`, `mean_nfe=7`; above baseline.
+- `beta=0.25`: latest `reward=0.591981`, `mean_nfe=22`; above baseline.
+- `beta=0.5`: latest `reward=0.701755`, `mean_nfe=35`; slightly below baseline `0.706879`.
+- `beta=0.75`: latest `reward=0.776531`, `mean_nfe=47`; above baseline.
+- `beta=1.0`: latest `reward=0.807150`, `mean_nfe=61`; below baseline `0.818322`.
+
+The last two snapshots were a real behavioral change, not cosmetic:
+- `r0000` used preview-guided refinement with one root and substantial late preview/backward spend.
+- rejected `r0001` shifted toward more roots but less evidence/continuation, and lost mostly from underuse.
+
+**Beta Schedule**
+The schedule is explicit in `_schedule(beta)` and monotonic in willingness to spend:
+- `beta=0.0`: target `10`; root probes `(0.6, 0.8)`; no backward children.
+- `beta=0.25`: target `20`; root probes `(0.5, 0.8, 0.9)`; `2` child probes, `1` child commit.
+- `beta=0.5`: target `36`; root probes `(0.5, 0.7, 0.9)`; `4` child probes, `2` child commits.
+- `beta=0.75`: target `48`; root probes `(0.4, 0.6, 0.8, 0.9)`; `6` child probes, `3` child commits, `mixed_noise`.
+- `beta=1.0`: target `64`; same root ladder, but `8` child probes, `4` child commits, wider anchor pool, more tail rounds.
+
+Monotonicity comes from increasing or loosening:
+- probe count,
+- child probe budget,
+- child commit budget,
+- anchor pool,
+- tail rounds,
+- later promotion time,
+- gentler exploration noise at high beta.
+
+`beta=1.0` cannot exceed `64` because every costly `forward`/`preview` path is guarded by `_can_afford(..., target_nfe=64, ...)`, `target_nfe=min(env.budget, 64)`, and final termination uses `answer(rule="best_preview_score")`, which has no implicit completion cost.
+
+**What’s New**
+Behaviorally new relative to the incumbent:
+- backward children are previewed immediately at the backward target time before earning finish budget;
+- promotion is adaptive from score gap and uncertainty/drift improvement, not just “spawn child then finish it”;
+- anchors are reused more evenly via `anchor_uses`, which preserves diversity at high beta without opening many roots;
+- tail spend is ambiguity-driven confirmation or one more selective local probe, aimed specifically at the weak `beta=0.5` and `beta=1.0` regimes.
+
+**Checks**
+Ran:
+- `python -m py_compile flow_autotts/controllers/optimal.py`
+- a toy public `FlowTTSEnv` dry-run across `beta in {0, 0.25, 0.5, 0.75, 1.0}`
+- a small SD35-like fake env dry-run to confirm termination and budget guards under step-based charging
+
+I did not run the full SD3.5 OCR evaluation.
+
+**Target-NFE Reflection**
+Injected references:
+- `beta=0.0 -> 10`
+- `beta=0.25 -> 20`
+- `beta=0.5 -> 36`
+- `beta=0.75 -> 48`
+- `beta=1.0 -> 64`
+
+Per beta:
+- `0.0`: underuse in old controller looked unnecessary relative to the locked `10`. I adjusted it upward with a two-preview root ladder and no branching; intended to stay near `10` without wasting compute on refinement.
+- `0.25`: old controller was already above baseline and near target. I kept compute modest; any residual underuse is more likely justified than harmful. The child-probe budget is capped tightly to avoid low-beta waste.
+- `0.5`: this is the main repair target. Old run trailed baseline at `35 vs 36` NFE. I increased evidence-gathering and selective refinement so this regime can use more of the target budget through child probes, promotion, and tail confirmation.
+- `0.75`: old run already beat baseline near target. I changed allocation, not just volume: more selective child screening and gentler high-beta pruning should preserve the strong result while keeping spend comparable.
+- `1.0`: old run trailed baseline and underused at `61 vs 64`. I explicitly added more child probes, more commits, larger anchor pool, and longer tail confirmation to improve utilization when evidence remains ambiguous, while all costly actions remain capped below the hard `64`.
+
+Main risk: because this controller stays single-root, if SD3.5 OCR needs fresh global diversity rather than local refinement at high beta, `beta=1.0` could still underuse or miss some wins. The proposal is meant primarily to improve `beta=0.5` and `beta=1.0` without regressing the already-strong `0.25` and `0.75` rows.

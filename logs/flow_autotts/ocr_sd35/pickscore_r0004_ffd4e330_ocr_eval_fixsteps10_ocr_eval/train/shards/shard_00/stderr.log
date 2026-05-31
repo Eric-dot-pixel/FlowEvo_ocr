@@ -1,0 +1,27 @@
+Loading pipeline components...:   0%|          | 0/9 [00:00<?, ?it/s]Loading pipeline components...:  11%|█         | 1/9 [00:02<00:18,  2.31s/it]Loading pipeline components...:  22%|██▏       | 2/9 [00:03<00:10,  1.46s/it]Loading pipeline components...:  33%|███▎      | 3/9 [00:03<00:05,  1.17it/s]
+Loading weights:   0%|          | 0/197 [00:00<?, ?it/s][A
+Loading weights:  44%|████▎     | 86/197 [00:00<00:00, 859.78it/s][ALoading weights: 100%|██████████| 197/197 [00:00<00:00, 1012.29it/s]
+Loading pipeline components...:  44%|████▍     | 4/9 [00:03<00:03,  1.39it/s]
+Loading weights:   0%|          | 0/219 [00:00<?, ?it/s][A
+Loading weights:   7%|▋         | 16/219 [00:00<00:01, 135.12it/s][A
+Loading weights:  14%|█▎        | 30/219 [00:00<00:01, 120.19it/s][A
+Loading weights:  20%|█▉        | 43/219 [00:00<00:01, 121.03it/s][A
+Loading weights:  26%|██▌       | 57/219 [00:00<00:01, 125.95it/s][A
+Loading weights:  32%|███▏      | 70/219 [00:00<00:01, 120.08it/s][A
+Loading weights:  39%|███▉      | 85/219 [00:00<00:01, 112.23it/s][A
+Loading weights:  44%|████▍     | 97/219 [00:00<00:01, 114.15it/s][A
+Loading weights:  51%|█████     | 112/219 [00:00<00:00, 119.95it/s][A
+Loading weights:  57%|█████▋    | 125/219 [00:01<00:00, 115.40it/s][A
+Loading weights:  63%|██████▎   | 139/219 [00:01<00:00, 122.10it/s][A
+Loading weights:  69%|██████▉   | 152/219 [00:01<00:00, 104.02it/s][A
+Loading weights:  76%|███████▋  | 167/219 [00:01<00:00, 113.26it/s][A
+Loading weights:  82%|████████▏ | 179/219 [00:01<00:00, 108.20it/s][A
+Loading weights:  87%|████████▋ | 191/219 [00:01<00:00, 92.41it/s] [A
+Loading weights:  92%|█████████▏| 201/219 [00:01<00:00, 79.48it/s][A
+Loading weights:  96%|█████████▋| 211/219 [00:02<00:00, 81.31it/s][ALoading weights: 100%|██████████| 219/219 [00:02<00:00, 102.42it/s]
+Loading pipeline components...:  78%|███████▊  | 7/9 [00:07<00:01,  1.05it/s]Loading pipeline components...:  89%|████████▉ | 8/9 [00:07<00:00,  1.31it/s]
+Loading weights:   0%|          | 0/517 [00:00<?, ?it/s][A
+Loading weights:  25%|██▌       | 130/517 [00:00<00:00, 1259.96it/s][A
+Loading weights:  50%|████▉     | 256/517 [00:00<00:00, 1008.73it/s][A
+Loading weights:  70%|██████▉   | 360/517 [00:00<00:00, 840.83it/s] [ALoading weights: 100%|██████████| 517/517 [00:00<00:00, 1113.13it/s]
+Loading pipeline components...: 100%|██████████| 9/9 [00:08<00:00,  1.25it/s]Loading pipeline components...: 100%|██████████| 9/9 [00:08<00:00,  1.11it/s]
